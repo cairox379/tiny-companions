@@ -12,7 +12,7 @@ html, body {
   overflow: hidden;
   width: 100vw;
   height: 100vh;
-  background: #000 !important;
+  background: transparent !important;
   font-family: Arial, sans-serif;
 }
 
@@ -84,17 +84,18 @@ camera.position.set(0, 0, 5);
 
 const renderer = new THREE.WebGLRenderer({
   alpha: true,
-  antialias: true
+  antialias: true,
+  premultipliedAlpha: false
 });
 
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setClearColor(0x000000, 0);
+renderer.setClearAlpha(0);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-
 document.body.appendChild(renderer.domElement);
 
-const ambient = new THREE.AmbientLight(0xffffff, 2.5);
+const ambient = new THREE.AmbientLight(0xffffff, 2.6);
 scene.add(ambient);
 
 const keyLight = new THREE.DirectionalLight(0xffffff, 3);
@@ -111,8 +112,9 @@ let pet = null;
 let mixer = null;
 let clock = new THREE.Clock();
 
+let baseY = -0.8;
 let targetX = 0;
-let targetY = -1;
+let targetY = baseY;
 let jumping = false;
 let jumpVelocity = 0;
 
@@ -126,9 +128,10 @@ const bubble = document.getElementById("bubble");
 function say(text) {
   bubble.textContent = text;
   bubble.style.display = "block";
-  setTimeout(() => {
+  clearTimeout(window.bubbleTimer);
+  window.bubbleTimer = setTimeout(() => {
     bubble.style.display = "none";
-  }, 2500);
+  }, 3000);
 }
 
 function cuteSound(type) {
@@ -149,6 +152,27 @@ function cuteSound(type) {
   osc.stop(ctx.currentTime + 0.25);
 }
 
+function fitModelToView(object) {
+  const box = new THREE.Box3().setFromObject(object);
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+
+  box.getSize(size);
+  box.getCenter(center);
+
+  object.position.x -= center.x;
+  object.position.y -= center.y;
+  object.position.z -= center.z;
+
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const targetSize = 1.8;
+  const scale = targetSize / maxDim;
+
+  object.scale.setScalar(scale);
+
+  object.position.set(0, baseY, 0);
+}
+
 function loadAnimal(type) {
   if (pet) {
     scene.remove(pet);
@@ -156,20 +180,21 @@ function loadAnimal(type) {
     mixer = null;
   }
 
+  say("Loading " + type + "...");
+
   loader.load(
     models[type],
     function(gltf) {
       pet = gltf.scene;
 
-      pet.scale.set(1.4, 1.4, 1.4);
-      pet.position.set(0, -1, 0);
-      pet.rotation.y = 0;
+      fitModelToView(pet);
 
       pet.traverse((child) => {
         if (child.isMesh) {
           child.frustumCulled = false;
           if (child.material) {
             child.material.needsUpdate = true;
+            child.material.side = THREE.DoubleSide;
           }
         }
       });
@@ -190,7 +215,7 @@ function loadAnimal(type) {
     undefined,
     function(error) {
       console.error(error);
-      say("Model not found. Check file name.");
+      say("Could not load " + models[type]);
     }
   );
 }
@@ -204,8 +229,8 @@ function jump() {
 
 function play() {
   if (!pet) return;
-  targetX = Math.random() * 2.6 - 1.3;
-  targetY = Math.random() * 1.2 - 1.2;
+  targetX = Math.random() * 2.2 - 1.1;
+  targetY = Math.random() * 1.0 - 1.0;
   cuteSound(localStorage.getItem("selectedPet") || "panda");
 }
 
@@ -227,7 +252,6 @@ function animate() {
     pet.position.y += (targetY - pet.position.y) * 0.025;
 
     pet.rotation.y = Math.sin(time * 1.2) * 0.25;
-
     pet.position.y += Math.sin(time * 3) * 0.002;
 
     if (jumping) {
