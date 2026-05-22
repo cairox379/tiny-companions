@@ -3,334 +3,449 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>Tiny Companions</title>
+<title>Tiny Companions 3D</title>
 
 <style>
-  body {
+  html, body {
     margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: transparent !important;
     width: 100vw;
     height: 100vh;
-    overflow: hidden;
-    background: transparent;
-    color: white;
     font-family: Arial, sans-serif;
   }
 
-  #app {
+  canvas {
     position: fixed;
     inset: 0;
+    background: transparent !important;
   }
 
-  #start {
+  #ui {
     position: fixed;
     top: 10px;
     right: 10px;
-    width: 210px;
-    padding: 12px;
-    border-radius: 16px;
-    background: rgba(0,0,0,0.8);
-    border: 1px solid rgba(255,255,255,0.25);
+    z-index: 10;
+    color: white;
   }
 
-  h1 {
-    font-size: 15px;
-    margin: 0 0 10px;
+  #chooser, #menu, #bubble {
+    background: rgba(0,0,0,0.65);
+    border: 1px solid rgba(120,240,255,0.45);
+    border-radius: 14px;
+    padding: 8px;
+    box-shadow: 0 0 14px rgba(80,220,255,0.35);
+    backdrop-filter: blur(8px);
+  }
+
+  #chooser {
+    width: 190px;
+  }
+
+  #chooser h3 {
+    margin: 0 0 8px;
+    font-size: 13px;
   }
 
   button {
     border: none;
-    border-radius: 12px;
-    padding: 9px;
-    margin: 4px;
-    background: rgba(255,255,255,0.18);
+    border-radius: 10px;
+    padding: 7px;
+    margin: 3px;
+    background: rgba(255,255,255,0.14);
     color: white;
-    font-size: 12px;
-  }
-
-  #pet {
-    position: fixed;
-    top: 18px;
-    right: 18px;
-    width: 70px;
-    height: 70px;
-    display: none;
-    animation: float 3s ease-in-out infinite;
-  }
-
-  #body {
-    position: relative;
-    width: 70px;
-    height: 70px;
-    background: orange;
-    border-radius: 50%;
-    box-shadow: 0 0 16px rgba(100,240,255,0.8);
-  }
-
-  .ear {
-    position: absolute;
-    top: -5px;
-    width: 22px;
-    height: 22px;
-    background: inherit;
-    border-radius: 6px;
-    transform: rotate(45deg);
-  }
-
-  .left { left: 8px; }
-  .right { right: 8px; }
-
-  .eye {
-    position: absolute;
-    top: 28px;
-    width: 6px;
-    height: 6px;
-    background: #111;
-    border-radius: 50%;
-    animation: blink 4s infinite;
-  }
-
-  .eye.left { left: 24px; }
-  .eye.right { right: 24px; }
-
-  .mouth {
-    position: absolute;
-    top: 43px;
-    left: 28px;
-    width: 14px;
-    height: 7px;
-    border-bottom: 2px solid #111;
-    border-radius: 0 0 12px 12px;
-  }
-
-  .tail {
-    position: absolute;
-    right: -16px;
-    bottom: 13px;
-    width: 32px;
-    height: 15px;
-    background: inherit;
-    border-radius: 50%;
-    animation: wag 1.3s ease-in-out infinite;
-  }
-
-  #bubble {
-    position: fixed;
-    top: 22px;
-    right: 95px;
-    max-width: 135px;
-    padding: 8px 10px;
-    border-radius: 14px;
-    background: rgba(0,0,0,0.82);
-    border: 1px solid rgba(255,255,255,0.25);
-    display: none;
-    font-size: 12px;
+    font-size: 11px;
   }
 
   #menu {
-    position: fixed;
-    top: 95px;
-    right: 10px;
     display: none;
+    margin-top: 8px;
     flex-direction: column;
-    background: rgba(0,0,0,0.78);
-    border-radius: 15px;
-    padding: 6px;
   }
 
-  .effect {
+  #bubble {
+    display: none;
     position: fixed;
-    top: 45px;
-    right: 50px;
-    font-size: 22px;
-    animation: pop 1s forwards;
-  }
-
-  @keyframes float {
-    0%,100% { transform: translateY(0); }
-    50% { transform: translateY(-6px); }
-  }
-
-  @keyframes wag {
-    0%,100% { transform: rotate(-10deg); }
-    50% { transform: rotate(16deg); }
-  }
-
-  @keyframes blink {
-    0%,93%,100% { transform: scaleY(1); }
-    96% { transform: scaleY(0.1); }
-  }
-
-  @keyframes pop {
-    from { opacity: 1; transform: translateY(0) scale(1); }
-    to { opacity: 0; transform: translateY(-35px) scale(1.4); }
+    top: 18px;
+    right: 215px;
+    max-width: 140px;
+    font-size: 12px;
   }
 </style>
 </head>
 
 <body>
-<div id="app">
+<canvas id="scene"></canvas>
 
-  <div id="start">
-    <h1>Choose Companion</h1>
-    <button onclick="choosePet('fox')">🦊 Fox</button>
-    <button onclick="choosePet('panda')">🐼 Panda</button>
-    <button onclick="choosePet('redpanda')">🍂 Red Panda</button>
-    <button onclick="choosePet('monkey')">🐵 Monkey</button>
-  </div>
-
-  <div id="bubble"></div>
-
-  <div id="pet" onclick="toggleMenu()">
-    <div id="body">
-      <div class="ear left"></div>
-      <div class="ear right"></div>
-      <div class="eye left"></div>
-      <div class="eye right"></div>
-      <div class="mouth"></div>
-      <div class="tail"></div>
-    </div>
+<div id="ui">
+  <div id="chooser">
+    <h3>Choose Companion</h3>
+    <button onclick="selectAnimal('fox')">🦊 Fox</button>
+    <button onclick="selectAnimal('panda')">🐼 Panda</button>
+    <button onclick="selectAnimal('redpanda')">🍂 Red Panda</button>
+    <button onclick="selectAnimal('monkey')">🐵 Monkey</button>
   </div>
 
   <div id="menu">
-    <button onclick="feed(event)">🍓 Feed</button>
-    <button onclick="petAction(event)">💖 Pet</button>
-    <button onclick="play(event)">✨ Play</button>
-    <button onclick="hidePet(event)">🙈 Hide</button>
-    <button onclick="changePet(event)">🔁 Change</button>
+    <button onclick="feed()">🍓 Feed</button>
+    <button onclick="pet()">💖 Pet</button>
+    <button onclick="play()">✨ Play</button>
+    <button onclick="hidePet()">🙈 Hide</button>
+    <button onclick="resetPet()">🔁 Change</button>
   </div>
-
 </div>
 
-<script>
-  const pets = {
-    fox: {
-      color: "#f47a2a",
-      messages: ["Let’s explore.", "I’m here with you.", "Snack time?", "That looks interesting."]
-    },
-    panda: {
-      color: "#f5f5f5",
-      messages: ["You’re doing great.", "Can we chill?", "I missed you.", "That looks peaceful."]
-    },
-    redpanda: {
-      color: "#c95b32",
-      messages: ["I feel safe with you.", "Hi, I’m still here.", "Can I have a snack?", "That looks cute."]
-    },
-    monkey: {
-      color: "#b97745",
-      messages: ["Tiny chaos time.", "Let’s play.", "That was wild.", "I found bananas."]
-    }
-  };
+<div id="bubble"></div>
 
-  let currentPet = localStorage.getItem("tinyPet") || null;
-  let hunger = Number(localStorage.getItem("hunger")) || 60;
-  let affection = Number(localStorage.getItem("affection")) || 60;
+<script type="module">
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
 
-  const start = document.getElementById("start");
-  const pet = document.getElementById("pet");
-  const body = document.getElementById("body");
-  const bubble = document.getElementById("bubble");
-  const menu = document.getElementById("menu");
+const canvas = document.getElementById("scene");
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  alpha: true,
+  antialias: true
+});
 
-  function save() {
-    localStorage.setItem("tinyPet", currentPet);
-    localStorage.setItem("hunger", hunger);
-    localStorage.setItem("affection", affection);
-    localStorage.setItem("lastInteraction", new Date().toISOString());
+renderer.setClearColor(0x000000, 0);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(
+  45,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  100
+);
+
+camera.position.z = 6;
+
+const light = new THREE.DirectionalLight(0xffffff, 2);
+light.position.set(2, 3, 4);
+scene.add(light);
+
+const softLight = new THREE.AmbientLight(0xffffff, 1.8);
+scene.add(softLight);
+
+let companion;
+let currentAnimal = localStorage.getItem("animal") || null;
+let targetX = 1.8;
+let targetY = 1.1;
+let visible = true;
+
+const bubble = document.getElementById("bubble");
+const chooser = document.getElementById("chooser");
+const menu = document.getElementById("menu");
+
+const personalities = {
+  fox: ["Let’s explore.", "I’m here with you.", "Snack time?", "That looks interesting."],
+  panda: ["You’re doing great.", "Can we chill?", "I missed you.", "That looks peaceful."],
+  redpanda: ["I feel safe with you.", "Hi, I’m still here.", "Can I have a snack?", "That looks cute."],
+  monkey: ["Tiny chaos time.", "Let’s play.", "That was wild.", "I found bananas."]
+};
+
+function makeMaterial(color, roughness = 0.6) {
+  return new THREE.MeshStandardMaterial({
+    color,
+    roughness,
+    metalness: 0.05
+  });
+}
+
+function sphere(size, color, x, y, z) {
+  const mesh = new THREE.Mesh(
+    new THREE.SphereGeometry(size, 32, 32),
+    makeMaterial(color)
+  );
+  mesh.position.set(x, y, z);
+  return mesh;
+}
+
+function cone(size, color, x, y, z, rotZ = 0) {
+  const mesh = new THREE.Mesh(
+    new THREE.ConeGeometry(size, size * 1.4, 32),
+    makeMaterial(color)
+  );
+  mesh.position.set(x, y, z);
+  mesh.rotation.z = rotZ;
+  return mesh;
+}
+
+function createAnimal(type) {
+  const group = new THREE.Group();
+
+  let main = 0xff7a2a;
+  let secondary = 0xffffff;
+  let dark = 0x111111;
+
+  if (type === "panda") {
+    main = 0xffffff;
+    secondary = 0x111111;
   }
 
-  function choosePet(type) {
-    currentPet = type;
-    save();
-    renderPet();
-    say("Hi. I’m your tiny companion.");
+  if (type === "redpanda") {
+    main = 0xc85a32;
+    secondary = 0xffe0bd;
   }
 
-  function renderPet() {
-    if (!currentPet) return;
-
-    start.style.display = "none";
-    pet.style.display = "block";
-    body.style.background = pets[currentPet].color;
+  if (type === "monkey") {
+    main = 0x9b5d2e;
+    secondary = 0xf1bc85;
   }
 
-  function randomMessage() {
-    const messages = pets[currentPet].messages;
-    return messages[Math.floor(Math.random() * messages.length)];
+  const body = sphere(0.48, main, 0, -0.18, 0);
+  body.scale.y = 1.12;
+  group.add(body);
+
+  const head = sphere(0.42, main, 0, 0.45, 0);
+  group.add(head);
+
+  const belly = sphere(0.28, secondary, 0, -0.2, 0.36);
+  belly.scale.y = 1.15;
+  group.add(belly);
+
+  const face = sphere(0.25, secondary, 0, 0.38, 0.34);
+  face.scale.y = 0.75;
+  group.add(face);
+
+  const eyeL = sphere(0.045, dark, -0.14, 0.5, 0.38);
+  const eyeR = sphere(0.045, dark, 0.14, 0.5, 0.38);
+  group.add(eyeL, eyeR);
+
+  const shineL = sphere(0.015, 0xffffff, -0.125, 0.515, 0.415);
+  const shineR = sphere(0.015, 0xffffff, 0.155, 0.515, 0.415);
+  group.add(shineL, shineR);
+
+  const nose = sphere(0.04, 0x111111, 0, 0.37, 0.55);
+  group.add(nose);
+
+  if (type === "fox" || type === "redpanda") {
+    const earL = cone(0.18, main, -0.25, 0.82, 0, -0.45);
+    const earR = cone(0.18, main, 0.25, 0.82, 0, 0.45);
+    group.add(earL, earR);
+
+    const tail = sphere(0.24, main, 0.55, -0.18, -0.1);
+    tail.scale.set(1.7, 0.8, 0.8);
+    tail.rotation.z = 0.5;
+    tail.name = "tail";
+    group.add(tail);
+
+    const tailTip = sphere(0.16, secondary, 0.82, -0.02, -0.08);
+    tailTip.scale.set(1.2, 0.75, 0.75);
+    tailTip.name = "tailTip";
+    group.add(tailTip);
   }
 
-  function say(text) {
-    bubble.textContent = text;
-    bubble.style.display = "block";
+  if (type === "panda") {
+    group.add(sphere(0.16, secondary, -0.26, 0.75, 0));
+    group.add(sphere(0.16, secondary, 0.26, 0.75, 0));
+    group.add(sphere(0.11, secondary, -0.14, 0.49, 0.39));
+    group.add(sphere(0.11, secondary, 0.14, 0.49, 0.39));
+  }
+
+  if (type === "monkey") {
+    group.add(sphere(0.17, main, -0.34, 0.45, 0));
+    group.add(sphere(0.17, main, 0.34, 0.45, 0));
+    group.add(sphere(0.12, secondary, -0.34, 0.45, 0.05));
+    group.add(sphere(0.12, secondary, 0.34, 0.45, 0.05));
+
+    const tail = new THREE.Mesh(
+      new THREE.TorusGeometry(0.28, 0.035, 16, 60),
+      makeMaterial(main)
+    );
+    tail.position.set(0.5, -0.18, -0.15);
+    tail.rotation.set(0.2, 0.5, 0.2);
+    tail.name = "tail";
+    group.add(tail);
+  }
+
+  const footL = sphere(0.13, main, -0.18, -0.72, 0.13);
+  const footR = sphere(0.13, main, 0.18, -0.72, 0.13);
+  group.add(footL, footR);
+
+  const armL = sphere(0.11, main, -0.45, -0.1, 0.05);
+  const armR = sphere(0.11, main, 0.45, -0.1, 0.05);
+  armL.scale.y = 1.5;
+  armR.scale.y = 1.5;
+  armL.name = "armL";
+  armR.name = "armR";
+  group.add(armL, armR);
+
+  group.scale.set(0.9, 0.9, 0.9);
+  group.position.set(1.8, 1.1, 0);
+
+  return group;
+}
+
+function selectAnimal(type) {
+  if (companion) scene.remove(companion);
+
+  currentAnimal = type;
+  localStorage.setItem("animal", type);
+
+  companion = createAnimal(type);
+  scene.add(companion);
+
+  chooser.style.display = "none";
+  menu.style.display = "flex";
+
+  say("Hi. I’m your tiny companion.");
+  playSound(type);
+}
+
+window.selectAnimal = selectAnimal;
+
+function say(text) {
+  bubble.innerText = text;
+  bubble.style.display = "block";
+
+  setTimeout(() => {
+    bubble.style.display = "none";
+  }, 3000);
+}
+
+function randomMessage() {
+  const list = personalities[currentAnimal] || ["I’m here."];
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+function playSound(type) {
+  const audio = new AudioContext();
+  const osc = audio.createOscillator();
+  const gain = audio.createGain();
+
+  osc.connect(gain);
+  gain.connect(audio.destination);
+
+  if (type === "fox") osc.frequency.value = 650;
+  if (type === "panda") osc.frequency.value = 300;
+  if (type === "redpanda") osc.frequency.value = 520;
+  if (type === "monkey") osc.frequency.value = 780;
+
+  gain.gain.setValueAtTime(0.04, audio.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.25);
+
+  osc.type = "sine";
+  osc.start();
+  osc.stop(audio.currentTime + 0.25);
+}
+
+function feed() {
+  say("Yum. Thank you.");
+  playSound(currentAnimal);
+  bounce();
+}
+
+function pet() {
+  say("That felt nice.");
+  playSound(currentAnimal);
+  hearts();
+}
+
+function play() {
+  say(randomMessage());
+  playSound(currentAnimal);
+  targetX = Math.random() * 3 - 1.5;
+  targetY = Math.random() * 1.5 - 0.1;
+}
+
+function hidePet() {
+  visible = !visible;
+  if (companion) companion.visible = visible;
+}
+
+function resetPet() {
+  localStorage.clear();
+  location.reload();
+}
+
+window.feed = feed;
+window.pet = pet;
+window.play = play;
+window.hidePet = hidePet;
+window.resetPet = resetPet;
+
+function bounce() {
+  if (!companion) return;
+  companion.scale.set(1.15, 1.15, 1.15);
+  setTimeout(() => companion.scale.set(0.9, 0.9, 0.9), 250);
+}
+
+function hearts() {
+  for (let i = 0; i < 4; i++) {
+    const heart = document.createElement("div");
+    heart.textContent = "💖";
+    heart.style.position = "fixed";
+    heart.style.right = 60 + Math.random() * 50 + "px";
+    heart.style.top = 70 + Math.random() * 40 + "px";
+    heart.style.fontSize = "18px";
+    heart.style.pointerEvents = "none";
+    heart.style.transition = "1s";
+    document.body.appendChild(heart);
 
     setTimeout(() => {
-      bubble.style.display = "none";
-    }, 3000);
+      heart.style.transform = "translateY(-45px) scale(1.4)";
+      heart.style.opacity = "0";
+    }, 50);
+
+    setTimeout(() => heart.remove(), 1100);
+  }
+}
+
+document.body.addEventListener("click", () => {
+  if (!currentAnimal) return;
+  menu.style.display = menu.style.display === "flex" ? "none" : "flex";
+  say(randomMessage());
+  playSound(currentAnimal);
+});
+
+setInterval(() => {
+  if (!companion) return;
+  targetX = Math.random() * 3 - 1.5;
+  targetY = Math.random() * 1.5 - 0.1;
+  say(randomMessage());
+}, 5000);
+
+function animate(time) {
+  requestAnimationFrame(animate);
+
+  if (companion) {
+    companion.position.x += (targetX - companion.position.x) * 0.01;
+    companion.position.y += (targetY - companion.position.y) * 0.01;
+
+    companion.rotation.y = Math.sin(time * 0.001) * 0.25;
+    companion.position.y += Math.sin(time * 0.003) * 0.0015;
+
+    const tail = companion.getObjectByName("tail");
+    if (tail) tail.rotation.z = Math.sin(time * 0.008) * 0.35;
+
+    const armL = companion.getObjectByName("armL");
+    const armR = companion.getObjectByName("armR");
+
+    if (armL) armL.rotation.z = Math.sin(time * 0.006) * 0.25;
+    if (armR) armR.rotation.z = -Math.sin(time * 0.006) * 0.25;
   }
 
-  function toggleMenu() {
-    if (!currentPet) return;
-    menu.style.display = menu.style.display === "flex" ? "none" : "flex";
-    say(randomMessage());
-  }
+  renderer.render(scene, camera);
+}
 
-  function feed(e) {
-    e.stopPropagation();
-    hunger = Math.min(100, hunger + 20);
-    save();
-    effect("🍓");
-    say("Yum. Thank you.");
-  }
+animate();
 
-  function petAction(e) {
-    e.stopPropagation();
-    affection = Math.min(100, affection + 20);
-    save();
-    effect("💖");
-    say("That felt nice.");
-  }
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
 
-  function play(e) {
-    e.stopPropagation();
-    affection = Math.min(100, affection + 10);
-    hunger = Math.max(0, hunger - 8);
-    save();
-    effect("✨");
-    say("Again, again!");
-  }
-
-  function hidePet(e) {
-    e.stopPropagation();
-    pet.style.display = "none";
-    menu.style.display = "none";
-  }
-
-  function changePet(e) {
-    e.stopPropagation();
-    localStorage.clear();
-    location.reload();
-  }
-
-  function effect(symbol) {
-    const el = document.createElement("div");
-    el.className = "effect";
-    el.textContent = symbol;
-    document.body.appendChild(el);
-
-    setTimeout(() => {
-      el.remove();
-    }, 1000);
-  }
-
-  setInterval(() => {
-    if (currentPet) {
-      pet.style.display = "block";
-      hunger = Math.max(0, hunger - 5);
-      save();
-      say(randomMessage());
-    }
-  }, 5 * 60 * 1000);
-
-  renderPet();
+if (currentAnimal) {
+  chooser.style.display = "none";
+  menu.style.display = "flex";
+  companion = createAnimal(currentAnimal);
+  scene.add(companion);
+}
 </script>
 </body>
 </html>
