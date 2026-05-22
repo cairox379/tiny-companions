@@ -2,19 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>Tiny Companions</title>
 
 <style>
-
 html, body {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  width: 100%;
-  height: 100%;
-  background: transparent !important;
+  width: 100vw;
+  height: 100vh;
+  background: #000 !important;
+  font-family: Arial, sans-serif;
 }
 
 canvas {
@@ -25,54 +24,63 @@ canvas {
 
 #ui {
   position: fixed;
-  top: 20px;
-  left: 20px;
-  z-index: 100;
+  top: 14px;
+  left: 14px;
+  z-index: 10;
   display: flex;
-  gap: 10px;
+  gap: 8px;
 }
 
 button {
-  background: rgba(0,0,0,0.6);
-  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(0,0,0,0.65);
   color: white;
-  padding: 12px 18px;
+  border: 1px solid rgba(120,240,255,0.45);
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+#bubble {
+  position: fixed;
+  top: 55px;
+  left: 14px;
+  z-index: 20;
+  color: white;
+  background: rgba(0,0,0,0.7);
+  border: 1px solid rgba(120,240,255,0.45);
   border-radius: 14px;
-  font-size: 16px;
-  backdrop-filter: blur(12px);
+  padding: 8px 10px;
+  font-size: 12px;
+  display: none;
 }
-
-button:hover {
-  background: rgba(255,255,255,0.15);
-  cursor: pointer;
-}
-
 </style>
 </head>
 
 <body>
 
 <div id="ui">
-  <button onclick="loadAnimal('panda')">🐼 Panda</button>
-  <button onclick="loadAnimal('fox')">🦊 Fox</button>
+  <button id="pandaBtn">🐼 Panda</button>
+  <button id="foxBtn">🦊 Fox</button>
+  <button id="jumpBtn">✨ Jump</button>
+  <button id="playBtn">🏃 Play</button>
 </div>
 
+<div id="bubble">Hi!</div>
+
 <script type="module">
-
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160/build/three.module.js';
-
-import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160/examples/jsm/loaders/GLTFLoader.js';
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
 
 const scene = new THREE.Scene();
 
 const camera = new THREE.PerspectiveCamera(
-  50,
+  45,
   window.innerWidth / window.innerHeight,
   0.1,
-  1000
+  100
 );
 
-camera.position.z = 4;
+camera.position.set(0, 0, 5);
 
 const renderer = new THREE.WebGLRenderer({
   alpha: true,
@@ -80,235 +88,172 @@ const renderer = new THREE.WebGLRenderer({
 });
 
 renderer.setSize(window.innerWidth, window.innerHeight);
-
-renderer.setPixelRatio(window.devicePixelRatio);
-
-renderer.setClearAlpha(0);
-
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(0x000000, 0);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 document.body.appendChild(renderer.domElement);
 
-
-
-// LIGHTING
-
 const ambient = new THREE.AmbientLight(0xffffff, 2.5);
 scene.add(ambient);
 
-const directional = new THREE.DirectionalLight(0xffffff, 3);
+const keyLight = new THREE.DirectionalLight(0xffffff, 3);
+keyLight.position.set(4, 5, 5);
+scene.add(keyLight);
 
-directional.position.set(5, 5, 5);
-
-scene.add(directional);
-
-const rim = new THREE.PointLight(0x66ccff, 4);
-
-rim.position.set(-4, 2, 2);
-
-scene.add(rim);
-
-
-
-// LOADER
+const rimLight = new THREE.PointLight(0x66ddff, 3);
+rimLight.position.set(-3, 2, 3);
+scene.add(rimLight);
 
 const loader = new GLTFLoader();
 
-let currentAnimal;
-let mixer;
+let pet = null;
+let mixer = null;
+let clock = new THREE.Clock();
 
+let targetX = 0;
+let targetY = -1;
+let jumping = false;
+let jumpVelocity = 0;
 
-
-// ANIMAL FILES
-
-const animals = {
-  panda: 'panda.glb',
-  fox: 'fox.glb'
+const models = {
+  panda: "./panda.glb",
+  fox: "./fox.glb"
 };
 
+const bubble = document.getElementById("bubble");
 
+function say(text) {
+  bubble.textContent = text;
+  bubble.style.display = "block";
+  setTimeout(() => {
+    bubble.style.display = "none";
+  }, 2500);
+}
 
-// LOAD ANIMAL
+function cuteSound(type) {
+  const ctx = new AudioContext();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  osc.frequency.value = type === "fox" ? 650 : 360;
+  osc.type = "sine";
+
+  gain.gain.setValueAtTime(0.04, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+
+  osc.start();
+  osc.stop(ctx.currentTime + 0.25);
+}
 
 function loadAnimal(type) {
-
-  if (currentAnimal) {
-    scene.remove(currentAnimal);
+  if (pet) {
+    scene.remove(pet);
+    pet = null;
+    mixer = null;
   }
 
   loader.load(
+    models[type],
+    function(gltf) {
+      pet = gltf.scene;
 
-    animals[type],
+      pet.scale.set(1.4, 1.4, 1.4);
+      pet.position.set(0, -1, 0);
+      pet.rotation.y = 0;
 
-    (gltf) => {
-
-      currentAnimal = gltf.scene;
-
-      currentAnimal.scale.set(1.6, 1.6, 1.6);
-
-      currentAnimal.position.set(0, -1.4, 0);
-
-      scene.add(currentAnimal);
-
-
-
-      // ENABLE SHADOWS + BETTER MATERIALS
-
-      currentAnimal.traverse((child) => {
-
+      pet.traverse((child) => {
         if (child.isMesh) {
-
-          child.castShadow = true;
-          child.receiveShadow = true;
-
+          child.frustumCulled = false;
           if (child.material) {
-
-            child.material.envMapIntensity = 1.8;
-
+            child.material.needsUpdate = true;
           }
-
         }
-
       });
 
+      scene.add(pet);
 
-
-      // ANIMATIONS FROM MODEL
-
-      if (gltf.animations.length > 0) {
-
-        mixer = new THREE.AnimationMixer(currentAnimal);
-
+      if (gltf.animations && gltf.animations.length > 0) {
+        mixer = new THREE.AnimationMixer(pet);
         gltf.animations.forEach((clip) => {
-
           mixer.clipAction(clip).play();
-
         });
-
       }
 
-
-
-      // FLOATING MOTION
-
-      animateFloat();
-
+      localStorage.setItem("selectedPet", type);
+      cuteSound(type);
+      say(type === "fox" ? "Let’s explore." : "Snack time?");
     },
-
     undefined,
-
-    (error) => {
-
+    function(error) {
       console.error(error);
-
-      alert("Model failed to load");
-
+      say("Model not found. Check file name.");
     }
-
   );
-
 }
 
-
-
-// FLOATING + LOOKING MOTION
-
-function animateFloat() {
-
-  let t = 0;
-
-  function floatLoop() {
-
-    requestAnimationFrame(floatLoop);
-
-    t += 0.02;
-
-    if (currentAnimal) {
-
-      currentAnimal.position.y =
-        -1.4 + Math.sin(t) * 0.08;
-
-      currentAnimal.rotation.y =
-        Math.sin(t * 0.7) * 0.25;
-
-    }
-
-  }
-
-  floatLoop();
-
+function jump() {
+  if (!pet) return;
+  jumping = true;
+  jumpVelocity = 0.08;
+  cuteSound(localStorage.getItem("selectedPet") || "panda");
 }
 
+function play() {
+  if (!pet) return;
+  targetX = Math.random() * 2.6 - 1.3;
+  targetY = Math.random() * 1.2 - 1.2;
+  cuteSound(localStorage.getItem("selectedPet") || "panda");
+}
 
-
-// RENDER LOOP
-
-const clock = new THREE.Clock();
+document.getElementById("pandaBtn").onclick = () => loadAnimal("panda");
+document.getElementById("foxBtn").onclick = () => loadAnimal("fox");
+document.getElementById("jumpBtn").onclick = jump;
+document.getElementById("playBtn").onclick = play;
 
 function animate() {
-
   requestAnimationFrame(animate);
 
   const delta = clock.getDelta();
+  const time = Date.now() * 0.001;
 
   if (mixer) mixer.update(delta);
 
-  renderer.render(scene, camera);
+  if (pet) {
+    pet.position.x += (targetX - pet.position.x) * 0.025;
+    pet.position.y += (targetY - pet.position.y) * 0.025;
 
+    pet.rotation.y = Math.sin(time * 1.2) * 0.25;
+
+    pet.position.y += Math.sin(time * 3) * 0.002;
+
+    if (jumping) {
+      pet.position.y += jumpVelocity;
+      jumpVelocity -= 0.005;
+
+      if (pet.position.y <= targetY) {
+        pet.position.y = targetY;
+        jumping = false;
+      }
+    }
+  }
+
+  renderer.render(scene, camera);
 }
 
 animate();
 
-
-
-// RESIZE
-
-window.addEventListener('resize', () => {
-
-  camera.aspect =
-    window.innerWidth / window.innerHeight;
-
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-
-  renderer.setSize(
-    window.innerWidth,
-    window.innerHeight
-  );
-
+  renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-
-
-// AUTO LOAD PANDA
-
-loadAnimal('panda');
-
-
-
-// CUTE SOUND EFFECTS
-
-const pandaSound = new Audio(
-  'https://assets.mixkit.co/active_storage/sfx/209/209-preview.mp3'
-);
-
-const foxSound = new Audio(
-  'https://assets.mixkit.co/active_storage/sfx/270/270-preview.mp3'
-);
-
-window.loadAnimal = function(type) {
-
-  loadAnimal(type);
-
-  if(type === 'panda') {
-    pandaSound.play();
-  }
-
-  if(type === 'fox') {
-    foxSound.play();
-  }
-
-};
-
+const saved = localStorage.getItem("selectedPet") || "panda";
+loadAnimal(saved);
 </script>
 
 </body>
