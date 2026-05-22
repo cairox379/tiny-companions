@@ -2,55 +2,74 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+/>
+
 <title>Tiny Companions</title>
 
 <style>
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
-  width: 100vw;
-  height: 100vh;
-  background: transparent !important;
-  font-family: Arial, sans-serif;
+
+  /* IMPORTANT */
+  background: #000 !important;
 }
 
 canvas {
   position: fixed;
   inset: 0;
+  display: block;
   background: transparent !important;
 }
 
 #ui {
   position: fixed;
-  top: 12px;
-  left: 12px;
-  z-index: 10;
+  top: 16px;
+  left: 16px;
+  z-index: 100;
   display: flex;
-  gap: 6px;
+  gap: 8px;
 }
 
 button {
-  background: rgba(0,0,0,0.55);
+  border: none;
+  border-radius: 14px;
+  padding: 10px 14px;
+
+  background: rgba(20,20,20,0.75);
   color: white;
-  border: 1px solid rgba(120,240,255,0.45);
-  border-radius: 10px;
-  padding: 7px 9px;
-  font-size: 11px;
+
+  font-size: 13px;
+  font-weight: 600;
+
+  backdrop-filter: blur(10px);
+
+  border: 1px solid rgba(255,255,255,0.15);
 }
 
-#bubble {
+#speech {
   position: fixed;
-  top: 50px;
-  left: 12px;
-  z-index: 20;
+  top: 70px;
+  left: 16px;
+  z-index: 100;
+
+  padding: 10px 14px;
+  border-radius: 16px;
+
+  background: rgba(20,20,20,0.75);
   color: white;
-  background: rgba(0,0,0,0.65);
-  border: 1px solid rgba(120,240,255,0.45);
-  border-radius: 12px;
-  padding: 8px 10px;
-  font-size: 12px;
+
+  font-size: 13px;
+
+  border: 1px solid rgba(255,255,255,0.15);
+
   display: none;
 }
 </style>
@@ -59,16 +78,19 @@ button {
 <body>
 
 <div id="ui">
-  <button onclick="makePanda()">🐼 Panda</button>
-  <button onclick="makeFox()">🦊 Fox</button>
-  <button onclick="jumpPet()">✨ Jump</button>
-  <button onclick="playPet()">💖 Play</button>
+  <button id="pandaBtn">🐼 Panda</button>
+  <button id="foxBtn">🦊 Fox</button>
+  <button id="jumpBtn">✨ Jump</button>
+  <button id="moveBtn">🏃 Play</button>
 </div>
 
-<div id="bubble"></div>
+<div id="speech">Hello!</div>
 
 <script type="module">
+
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+
+/* ---------------- SCENE ---------------- */
 
 const scene = new THREE.Scene();
 
@@ -79,280 +101,357 @@ const camera = new THREE.PerspectiveCamera(
   100
 );
 
-camera.position.set(0, 0, 6);
+camera.position.z = 7;
 
 const renderer = new THREE.WebGLRenderer({
   alpha: true,
-  antialias: true,
-  premultipliedAlpha: false
+  antialias: true
 });
 
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+renderer.setPixelRatio(
+  Math.min(window.devicePixelRatio, 2)
+);
+
+/* IMPORTANT */
 renderer.setClearColor(0x000000, 0);
 renderer.setClearAlpha(0);
+
 document.body.appendChild(renderer.domElement);
 
-scene.add(new THREE.AmbientLight(0xffffff, 2.8));
+/* ---------------- LIGHTS ---------------- */
 
-const key = new THREE.DirectionalLight(0xffffff, 3);
-key.position.set(4, 5, 5);
-scene.add(key);
+const ambient = new THREE.AmbientLight(0xffffff, 2.5);
+scene.add(ambient);
 
-const rim = new THREE.PointLight(0x7defff, 3);
-rim.position.set(-3, 2, 4);
-scene.add(rim);
+const light1 = new THREE.DirectionalLight(0xffffff, 3);
+light1.position.set(5, 5, 5);
+scene.add(light1);
 
-let pet;
-let petType = "panda";
-let targetX = 0;
-let targetY = -0.45;
-let jumping = false;
-let jumpVelocity = 0;
-let playing = false;
+const light2 = new THREE.PointLight(0x66ddff, 3);
+light2.position.set(-5, 3, 5);
+scene.add(light2);
 
-const bubble = document.getElementById("bubble");
+/* ---------------- SPEECH ---------------- */
+
+const speech = document.getElementById("speech");
 
 function say(text) {
-  bubble.textContent = text;
-  bubble.style.display = "block";
+  speech.innerText = text;
+  speech.style.display = "block";
 
-  clearTimeout(window.bubbleTimer);
-  window.bubbleTimer = setTimeout(() => {
-    bubble.style.display = "none";
+  clearTimeout(window.speechTimeout);
+
+  window.speechTimeout = setTimeout(() => {
+    speech.style.display = "none";
   }, 2500);
 }
 
-function mat(color, roughness = 0.55) {
-  return new THREE.MeshStandardMaterial({
-    color,
-    roughness,
-    metalness: 0.03
+/* ---------------- PET ---------------- */
+
+let pet;
+let currentType = "panda";
+
+const petGroup = new THREE.Group();
+scene.add(petGroup);
+
+/* ---------------- CREATE PANDA ---------------- */
+
+function createPanda() {
+
+  const panda = new THREE.Group();
+
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.6
   });
-}
 
-function sphere(radius, color, x, y, z, sx = 1, sy = 1, sz = 1) {
-  const mesh = new THREE.Mesh(
-    new THREE.SphereGeometry(radius, 32, 32),
-    mat(color)
+  const blackMat = new THREE.MeshStandardMaterial({
+    color: 0x111111,
+    roughness: 0.6
+  });
+
+  /* BODY */
+  const body = new THREE.Mesh(
+    new THREE.SphereGeometry(1.1, 64, 64),
+    bodyMat
   );
 
-  mesh.position.set(x, y, z);
-  mesh.scale.set(sx, sy, sz);
+  body.scale.y = 1.2;
 
-  return mesh;
-}
+  panda.add(body);
 
-function cone(radius, height, color, x, y, z, rx = 0, ry = 0, rz = 0) {
-  const mesh = new THREE.Mesh(
-    new THREE.ConeGeometry(radius, height, 32),
-    mat(color)
+  /* HEAD */
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.8, 64, 64),
+    bodyMat
   );
 
-  mesh.position.set(x, y, z);
-  mesh.rotation.set(rx, ry, rz);
+  head.position.y = 1.3;
 
-  return mesh;
-}
+  panda.add(head);
 
-function cylinder(radius, height, color, x, y, z, rx = 0, ry = 0, rz = 0) {
-  const mesh = new THREE.Mesh(
-    new THREE.CylinderGeometry(radius, radius, height, 32),
-    mat(color)
+  /* EARS */
+  const earL = new THREE.Mesh(
+    new THREE.SphereGeometry(0.22, 32, 32),
+    blackMat
   );
 
-  mesh.position.set(x, y, z);
-  mesh.rotation.set(rx, ry, rz);
+  earL.position.set(-0.45, 1.95, 0);
 
-  return mesh;
+  panda.add(earL);
+
+  const earR = earL.clone();
+  earR.position.x = 0.45;
+
+  panda.add(earR);
+
+  /* EYES */
+  const eyeGeo = new THREE.SphereGeometry(0.12, 32, 32);
+
+  const eyeMat = new THREE.MeshStandardMaterial({
+    color: 0x000000
+  });
+
+  const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+
+  eyeL.position.set(-0.22, 1.35, 0.65);
+
+  panda.add(eyeL);
+
+  const eyeR = eyeL.clone();
+  eyeR.position.x = 0.22;
+
+  panda.add(eyeR);
+
+  /* LEGS */
+  const legGeo = new THREE.SphereGeometry(0.25, 32, 32);
+
+  const leg1 = new THREE.Mesh(legGeo, blackMat);
+  leg1.position.set(-0.45, -1.1, 0.3);
+
+  panda.add(leg1);
+
+  const leg2 = leg1.clone();
+  leg2.position.x = 0.45;
+
+  panda.add(leg2);
+
+  panda.scale.set(0.9, 0.9, 0.9);
+
+  return panda;
 }
 
-function clearPet() {
+/* ---------------- CREATE FOX ---------------- */
+
+function createFox() {
+
+  const fox = new THREE.Group();
+
+  const orange = new THREE.MeshStandardMaterial({
+    color: 0xff7a2f,
+    roughness: 0.6
+  });
+
+  const white = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.5
+  });
+
+  const dark = new THREE.MeshStandardMaterial({
+    color: 0x2a1b12,
+    roughness: 0.7
+  });
+
+  /* BODY */
+  const body = new THREE.Mesh(
+    new THREE.SphereGeometry(1.0, 64, 64),
+    orange
+  );
+
+  body.scale.y = 0.9;
+
+  fox.add(body);
+
+  /* HEAD */
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.8, 64, 64),
+    orange
+  );
+
+  head.position.y = 1.15;
+
+  fox.add(head);
+
+  /* MUZZLE */
+  const muzzle = new THREE.Mesh(
+    new THREE.SphereGeometry(0.38, 32, 32),
+    white
+  );
+
+  muzzle.position.set(0, 1.0, 0.6);
+
+  fox.add(muzzle);
+
+  /* EARS */
+  const earGeo = new THREE.ConeGeometry(0.18, 0.45, 32);
+
+  const earL = new THREE.Mesh(earGeo, orange);
+
+  earL.position.set(-0.35, 1.9, 0);
+  earL.rotation.z = 0.2;
+
+  fox.add(earL);
+
+  const earR = earL.clone();
+
+  earR.position.x = 0.35;
+  earR.rotation.z = -0.2;
+
+  fox.add(earR);
+
+  /* EYES */
+  const eyeGeo = new THREE.SphereGeometry(0.1, 32, 32);
+
+  const eyeMat = new THREE.MeshStandardMaterial({
+    color: 0x111111
+  });
+
+  const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+
+  eyeL.position.set(-0.22, 1.25, 0.65);
+
+  fox.add(eyeL);
+
+  const eyeR = eyeL.clone();
+  eyeR.position.x = 0.22;
+
+  fox.add(eyeR);
+
+  /* TAIL */
+  const tail = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.12, 0.22, 1.5, 32),
+    orange
+  );
+
+  tail.position.set(-1, -0.1, -0.2);
+
+  tail.rotation.z = -1.1;
+
+  fox.add(tail);
+
+  fox.scale.set(0.9, 0.9, 0.9);
+
+  return fox;
+}
+
+/* ---------------- LOAD PET ---------------- */
+
+function loadPet(type) {
+
+  currentType = type;
+
   if (pet) {
-    scene.remove(pet);
-    pet = null;
+    petGroup.remove(pet);
   }
+
+  pet = type === "fox"
+    ? createFox()
+    : createPanda();
+
+  pet.position.y = -0.8;
+
+  petGroup.add(pet);
+
+  say(
+    type === "fox"
+      ? "Let's explore!"
+      : "Snack time?"
+  );
 }
 
-function cuteSound(freq = 420) {
-  const ctx = new AudioContext();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
+loadPet("panda");
 
-  osc.connect(gain);
-  gain.connect(ctx.destination);
+/* ---------------- BUTTONS ---------------- */
 
-  osc.frequency.value = freq;
-  osc.type = "sine";
-
-  gain.gain.setValueAtTime(0.035, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.22);
-
-  osc.start();
-  osc.stop(ctx.currentTime + 0.22);
-}
-
-window.makePanda = function() {
-  clearPet();
-
-  petType = "panda";
-  pet = new THREE.Group();
-
-  const white = 0xf8f4ef;
-  const black = 0x111111;
-  const blush = 0xffb6c8;
-
-  pet.add(sphere(0.55, white, 0, -0.15, 0, 1, 1.12, 0.95));
-  pet.add(sphere(0.42, white, 0, 0.55, 0, 1, 1, 0.95));
-
-  pet.add(sphere(0.17, black, -0.28, 0.83, -0.02));
-  pet.add(sphere(0.17, black, 0.28, 0.83, -0.02));
-
-  pet.add(sphere(0.17, black, -0.17, 0.58, 0.34, 1.1, 1.35, 0.65));
-  pet.add(sphere(0.17, black, 0.17, 0.58, 0.34, 1.1, 1.35, 0.65));
-
-  pet.add(sphere(0.045, white, -0.12, 0.62, 0.48));
-  pet.add(sphere(0.045, white, 0.12, 0.62, 0.48));
-
-  pet.add(sphere(0.035, black, -0.12, 0.62, 0.54));
-  pet.add(sphere(0.035, black, 0.12, 0.62, 0.54));
-
-  pet.add(sphere(0.055, black, 0, 0.47, 0.55, 1.2, 0.8, 0.9));
-
-  pet.add(sphere(0.28, white, 0, -0.2, 0.47, 1, 1.25, 0.6));
-
-  pet.add(sphere(0.13, black, -0.47, 0.05, 0.1, 0.8, 1.6, 0.8));
-  pet.add(sphere(0.13, black, 0.47, 0.05, 0.1, 0.8, 1.6, 0.8));
-
-  pet.add(sphere(0.15, black, -0.25, -0.7, 0.1, 1.2, 0.75, 0.9));
-  pet.add(sphere(0.15, black, 0.25, -0.7, 0.1, 1.2, 0.75, 0.9));
-
-  pet.add(sphere(0.06, blush, -0.26, 0.43, 0.5, 1, 0.6, 0.3));
-  pet.add(sphere(0.06, blush, 0.26, 0.43, 0.5, 1, 0.6, 0.3));
-
-  pet.scale.set(0.85, 0.85, 0.85);
-  pet.position.set(0, targetY, 0);
-  scene.add(pet);
-
-  say("Snack time?");
-  cuteSound(360);
+document.getElementById("pandaBtn").onclick = () => {
+  loadPet("panda");
 };
 
-window.makeFox = function() {
-  clearPet();
-
-  petType = "fox";
-  pet = new THREE.Group();
-
-  const orange = 0xf47c2c;
-  const cream = 0xfff0d8;
-  const black = 0x191919;
-  const dark = 0x2b1a14;
-
-  pet.add(sphere(0.45, orange, 0, -0.22, 0, 1, 1.18, 0.9));
-  pet.add(sphere(0.38, orange, 0, 0.48, 0, 1, 1, 0.9));
-
-  pet.add(cone(0.18, 0.42, orange, -0.23, 0.86, 0, 0, 0, -0.35));
-  pet.add(cone(0.18, 0.42, orange, 0.23, 0.86, 0, 0, 0, 0.35));
-
-  pet.add(cone(0.1, 0.25, cream, -0.23, 0.86, 0.05, 0, 0, -0.35));
-  pet.add(cone(0.1, 0.25, cream, 0.23, 0.86, 0.05, 0, 0, 0.35));
-
-  pet.add(sphere(0.23, cream, -0.16, 0.4, 0.35, 1.2, 0.75, 0.55));
-  pet.add(sphere(0.23, cream, 0.16, 0.4, 0.35, 1.2, 0.75, 0.55));
-  pet.add(sphere(0.12, cream, 0, 0.31, 0.48, 1.3, 0.85, 0.7));
-
-  pet.add(sphere(0.055, black, -0.13, 0.56, 0.42));
-  pet.add(sphere(0.055, black, 0.13, 0.56, 0.42));
-
-  pet.add(sphere(0.02, whiteColor(), -0.11, 0.58, 0.47));
-  pet.add(sphere(0.02, whiteColor(), 0.15, 0.58, 0.47));
-
-  pet.add(sphere(0.04, black, 0, 0.36, 0.62, 1.2, 0.85, 0.8));
-
-  pet.add(sphere(0.25, cream, 0, -0.22, 0.43, 1, 1.3, 0.55));
-
-  pet.add(sphere(0.09, dark, -0.2, -0.7, 0.1, 0.9, 1.1, 0.9));
-  pet.add(sphere(0.09, dark, 0.2, -0.7, 0.1, 0.9, 1.1, 0.9));
-
-  pet.add(sphere(0.1, orange, -0.4, -0.2, 0.05, 0.85, 1.6, 0.8));
-  pet.add(sphere(0.1, orange, 0.4, -0.2, 0.05, 0.85, 1.6, 0.8));
-
-  const tail = sphere(0.22, orange, 0.55, -0.18, -0.08, 1.9, 0.78, 0.8);
-  tail.rotation.z = 0.5;
-  tail.name = "tail";
-  pet.add(tail);
-
-  const tailTip = sphere(0.13, cream, 0.83, -0.03, -0.06, 1.25, 0.7, 0.7);
-  tailTip.rotation.z = 0.5;
-  tailTip.name = "tailTip";
-  pet.add(tailTip);
-
-  pet.scale.set(0.82, 0.82, 0.82);
-  pet.position.set(0, targetY, 0);
-  scene.add(pet);
-
-  say("Let’s explore.");
-  cuteSound(680);
+document.getElementById("foxBtn").onclick = () => {
+  loadPet("fox");
 };
 
-function whiteColor() {
-  return 0xffffff;
-}
-
-window.jumpPet = function() {
+document.getElementById("jumpBtn").onclick = () => {
   if (!pet) return;
+
   jumping = true;
-  jumpVelocity = 0.075;
-  cuteSound(petType === "fox" ? 680 : 360);
-  say("Wheee!");
+  velocity = 0.12;
 };
 
-window.playPet = function() {
-  if (!pet) return;
-  playing = true;
-  targetX = Math.random() * 2.2 - 1.1;
-  targetY = Math.random() * 0.7 - 0.7;
-  cuteSound(petType === "fox" ? 680 : 360);
-  say("Let’s play!");
+document.getElementById("moveBtn").onclick = () => {
 
-  setTimeout(() => {
-    playing = false;
-  }, 2500);
+  targetX = (Math.random() - 0.5) * 3;
+  targetY = -0.8 + Math.random() * 0.5;
+
+  say(
+    currentType === "fox"
+      ? "Tiny chaos!"
+      : "Yay!"
+  );
 };
+
+/* ---------------- ANIMATION ---------------- */
+
+let targetX = 0;
+let targetY = -0.8;
+
+let jumping = false;
+let velocity = 0;
 
 function animate() {
+
   requestAnimationFrame(animate);
 
-  const time = Date.now() * 0.001;
+  const t = Date.now() * 0.001;
 
   if (pet) {
-    pet.position.x += (targetX - pet.position.x) * 0.035;
-    pet.position.y += (targetY - pet.position.y) * 0.035;
 
-    pet.position.y += Math.sin(time * 3) * 0.002;
-    pet.rotation.y = Math.sin(time * 1.1) * 0.25;
+    pet.position.x +=
+      (targetX - pet.position.x) * 0.03;
 
-    if (playing) {
-      pet.rotation.z = Math.sin(time * 8) * 0.08;
-    } else {
-      pet.rotation.z *= 0.9;
-    }
+    pet.position.y +=
+      (targetY - pet.position.y) * 0.03;
 
-    const tail = pet.getObjectByName("tail");
-    const tailTip = pet.getObjectByName("tailTip");
+    pet.rotation.y =
+      Math.sin(t * 1.5) * 0.25;
 
-    if (tail) tail.rotation.z = 0.5 + Math.sin(time * 5) * 0.25;
-    if (tailTip) tailTip.rotation.z = 0.5 + Math.sin(time * 5) * 0.25;
+    pet.position.y +=
+      Math.sin(t * 4) * 0.005;
 
     if (jumping) {
-      pet.position.y += jumpVelocity;
-      jumpVelocity -= 0.005;
+
+      pet.position.y += velocity;
+
+      velocity -= 0.008;
 
       if (pet.position.y <= targetY) {
+
         pet.position.y = targetY;
+
         jumping = false;
       }
+    }
+
+    /* tail wiggle */
+    if (currentType === "fox") {
+      pet.children.forEach((child) => {
+        if (child.geometry?.type === "CylinderGeometry") {
+          child.rotation.y =
+            Math.sin(t * 6) * 0.4;
+        }
+      });
     }
   }
 
@@ -361,13 +460,21 @@ function animate() {
 
 animate();
 
+/* ---------------- RESIZE ---------------- */
+
 window.addEventListener("resize", () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+
+  camera.aspect =
+    window.innerWidth / window.innerHeight;
+
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  renderer.setSize(
+    window.innerWidth,
+    window.innerHeight
+  );
 });
 
-makePanda();
 </script>
 
 </body>
