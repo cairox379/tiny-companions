@@ -1,72 +1,29 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>Tiny Companions</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 html, body {
   margin: 0;
-  padding: 0;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
-  width: 100vw;
-  height: 100vh;
-  background: transparent !important;
-  font-family: Arial, sans-serif;
+  background: transparent;
 }
-
 canvas {
-  position: fixed;
-  inset: 0;
-  background: transparent !important;
+  display: block;
 }
-
-#ui {
-  position: fixed;
-  top: 14px;
-  left: 14px;
-  z-index: 10;
-  display: flex;
-  gap: 6px;
-}
-
 button {
-  background: rgba(0,0,0,0.65);
-  color: white;
-  border: 1px solid rgba(120,240,255,0.45);
-  border-radius: 10px;
-  padding: 7px 10px;
-  font-size: 11px;
-}
-
-#bubble {
   position: fixed;
-  top: 52px;
-  left: 14px;
-  color: white;
-  background: rgba(0,0,0,0.7);
-  border: 1px solid rgba(120,240,255,0.45);
-  border-radius: 12px;
-  padding: 8px 10px;
-  font-size: 12px;
-  display: none;
-  z-index: 20;
+  top: 10px;
+  left: 10px;
+  z-index: 10;
 }
 </style>
 </head>
-
 <body>
 
-<div id="ui">
-  <button onclick="loadAnimal('panda')">🐼 Panda</button>
-  <button onclick="loadAnimal('fox')">🦊 Fox</button>
-  <button onclick="jumpPet()">✨ Jump</button>
-  <button onclick="playPet()">🏃 Play</button>
-  <button onclick="petPet()">💖 Pet</button>
-</div>
-
-<div id="bubble">Loading...</div>
+<button onclick="loadPanda()">Load Panda</button>
 
 <script type="module">
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
@@ -74,211 +31,55 @@ import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/
 
 const scene = new THREE.Scene();
 
-const camera = new THREE.PerspectiveCamera(
-  45,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  100
-);
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 100);
+camera.position.z = 4;
 
-camera.position.set(0, 0, 5);
-
-const renderer = new THREE.WebGLRenderer({
-  alpha: true,
-  antialias: true,
-  premultipliedAlpha: false
-});
-
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+renderer.setSize(innerWidth, innerHeight);
 renderer.setClearColor(0x000000, 0);
-renderer.setClearAlpha(0);
-
 document.body.appendChild(renderer.domElement);
 
 scene.add(new THREE.AmbientLight(0xffffff, 3));
 
-const keyLight = new THREE.DirectionalLight(0xffffff, 3);
-keyLight.position.set(4, 5, 5);
-scene.add(keyLight);
+const light = new THREE.DirectionalLight(0xffffff, 4);
+light.position.set(3, 5, 5);
+scene.add(light);
 
-const rimLight = new THREE.PointLight(0x8df7ff, 3);
-rimLight.position.set(-3, 2, 3);
-scene.add(rimLight);
+let pet;
 
-const loader = new GLTFLoader();
+window.loadPanda = function () {
+  const loader = new GLTFLoader();
 
-let pet = null;
-let selectedPet = localStorage.getItem("selectedPet") || "panda";
+  loader.load("panda.glb", function (gltf) {
+    pet = gltf.scene;
 
-let baseY = -0.8;
-let targetX = 0;
-let targetY = baseY;
-let jumpVelocity = 0;
-let jumping = false;
-let playing = false;
-let petting = false;
+    const box = new THREE.Box3().setFromObject(pet);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
 
-const models = {
-  panda: "panda.glb",
-  fox: "fox.glb"
+    box.getSize(size);
+    box.getCenter(center);
+
+    pet.position.sub(center);
+
+    const maxSize = Math.max(size.x, size.y, size.z);
+    pet.scale.setScalar(2 / maxSize);
+
+    scene.add(pet);
+  }, undefined, function (error) {
+    alert("Panda failed to load");
+    console.error(error);
+  });
 };
 
-const bubble = document.getElementById("bubble");
-
-function say(text) {
-  bubble.textContent = text;
-  bubble.style.display = "block";
-
-  clearTimeout(window.bubbleTimer);
-  window.bubbleTimer = setTimeout(() => {
-    bubble.style.display = "none";
-  }, 2500);
-}
-
-function sound(type) {
-  const ctx = new AudioContext();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-
-  osc.frequency.value = type === "fox" ? 680 : 360;
-  osc.type = "sine";
-
-  gain.gain.setValueAtTime(0.045, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.22);
-
-  osc.start();
-  osc.stop(ctx.currentTime + 0.22);
-}
-
-function fitModel(object, type) {
-  const box = new THREE.Box3().setFromObject(object);
-  const size = new THREE.Vector3();
-  const center = new THREE.Vector3();
-
-  box.getSize(size);
-  box.getCenter(center);
-
-  object.position.x -= center.x;
-  object.position.y -= center.y;
-  object.position.z -= center.z;
-
-  const maxDim = Math.max(size.x, size.y, size.z);
-  const targetSize = type === "fox" ? 1.8 : 1.9;
-  const scale = targetSize / maxDim;
-
-  object.scale.setScalar(scale);
-  object.position.set(0, baseY, 0);
-}
-
-window.loadAnimal = function(type) {
-  selectedPet = type;
-  localStorage.setItem("selectedPet", type);
-
-  if (pet) {
-    scene.remove(pet);
-    pet = null;
-  }
-
-  say("Loading " + type + "...");
-
-  loader.load(
-    models[type],
-    function(gltf) {
-      pet = gltf.scene;
-
-      fitModel(pet, type);
-
-      pet.traverse((child) => {
-        if (child.isMesh && child.material) {
-          child.material.side = THREE.DoubleSide;
-          child.material.needsUpdate = true;
-          child.frustumCulled = false;
-        }
-      });
-
-      scene.add(pet);
-
-      targetX = 0;
-      targetY = baseY;
-
-      say(type === "fox" ? "Let’s explore." : "Snack time?");
-      sound(type);
-    },
-    undefined,
-    function(error) {
-      console.error(error);
-      say("Model failed: " + models[type]);
-    }
-  );
-};
-
-window.jumpPet = function() {
-  if (!pet) return;
-  jumping = true;
-  jumpVelocity = 0.09;
-  sound(selectedPet);
-  say("Wheee!");
-};
-
-window.playPet = function() {
-  if (!pet) return;
-  playing = true;
-  targetX = Math.random() * 2.2 - 1.1;
-  targetY = Math.random() * 0.8 - 1.0;
-  sound(selectedPet);
-  say("Let’s play!");
-
-  setTimeout(() => {
-    playing = false;
-  }, 3500);
-};
-
-window.petPet = function() {
-  if (!pet) return;
-  petting = true;
-  sound(selectedPet);
-  say("Aww, thank you!");
-
-  setTimeout(() => {
-    petting = false;
-  }, 1600);
-};
+loadPanda();
 
 function animate() {
   requestAnimationFrame(animate);
 
-  const time = Date.now() * 0.001;
-
   if (pet) {
-    pet.position.x += (targetX - pet.position.x) * 0.025;
-    pet.position.y += (targetY - pet.position.y) * 0.025;
-
-    pet.position.y += Math.sin(time * 3) * 0.003;
-    pet.rotation.y = Math.sin(time * 1.2) * 0.28;
-
-    if (playing) {
-      pet.rotation.z = Math.sin(time * 8) * 0.12;
-      pet.rotation.x = Math.sin(time * 6) * 0.07;
-    } else if (petting) {
-      pet.rotation.z = Math.sin(time * 10) * 0.08;
-    } else {
-      pet.rotation.z *= 0.9;
-      pet.rotation.x *= 0.9;
-    }
-
-    if (jumping) {
-      pet.position.y += jumpVelocity;
-      jumpVelocity -= 0.006;
-
-      if (pet.position.y <= targetY) {
-        pet.position.y = targetY;
-        jumping = false;
-      }
-    }
+    pet.rotation.y += 0.01;
+    pet.position.y = Math.sin(Date.now() * 0.002) * 0.1;
   }
 
   renderer.render(scene, camera);
@@ -286,13 +87,11 @@ function animate() {
 
 animate();
 
-window.addEventListener("resize", () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(innerWidth, innerHeight);
 });
-
-loadAnimal(selectedPet);
 </script>
 
 </body>
